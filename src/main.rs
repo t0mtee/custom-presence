@@ -35,7 +35,7 @@ fn main() {
         .expect("Failed to convert path to string")
         + "/config.json";
 
-    let mut drpc: Client;
+    let mut drpc;
 
     loop {
         println!("-------------------");
