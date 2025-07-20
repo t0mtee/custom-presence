@@ -16,6 +16,7 @@ struct Game {
     process_name: String,
     app_id: u64,
     state: String,
+    activity_type: ActivityType,
     large_text: String,
     large_image: String,
     small_text: String,
@@ -62,7 +63,11 @@ fn main() {
         'gamescan: for game in config.games {
             println!("Searching for processes that match {}", game.process_name);
 
-            let name_length = cmp::min(game.process_name.len(), 15);
+            let name_length = if cfg!(target_os = "linux") {
+                cmp::min(game.process_name.len(), 15)
+            } else {
+                game.process_name.len()
+            };
 
             for process in system.processes_by_exact_name(game.process_name[..name_length].as_ref())
             {
@@ -86,7 +91,7 @@ fn main() {
                     // Set the activity
                     drpc.set_activity(|act| {
                         act.state(game.state.as_str())
-                            .activity_type(ActivityType::Playing)
+                            .activity_type(game.activity_type)
                             .assets(|assets| {
                                 assets
                                     .large_text(game.large_text.as_str())
@@ -107,13 +112,14 @@ fn main() {
         match pid {
             Some(p) => {
                 while let Some(_) = system.process(p) {
+                    sleep(Duration::new(config.check_time, 0));
+                    system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[p]), true);
+
                     println!("Process {} is still running.", p);
                     println!(
                         "Sleeping for {} seconds before the next process check.",
                         config.check_time
                     );
-                    sleep(Duration::new(config.check_time, 0));
-                    system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[p]), true);
                 }
 
                 println!("Process ended!");
