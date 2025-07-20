@@ -71,7 +71,7 @@ fn main() {
                 if let None = process.thread_kind() {
                     pid = Some(process.pid());
 
-                    println!("Process {} matches {}", process.pid(), game.process_name);
+                    println!("Process {} matches {}", pid.unwrap(), game.process_name);
 
                     drpc = Client::new(game.app_id);
 
