@@ -1,9 +1,9 @@
+use dirs::config_dir;
 use discord_presence::{models::ActivityType, Client, Event};
 use serde::Deserialize;
 use sysinfo::{Pid, System};
 
 use std::cmp;
-use std::env::current_exe;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::ErrorKind::NotFound;
@@ -29,12 +29,8 @@ struct Config {
 }
 
 fn main() {
-    let path = current_exe()
-        .expect("Can't find current executable")
-        .parent()
-        .and_then(|p| p.to_str().map(|s| s.to_owned()))
-        .expect("Failed to convert path to string")
-        + "/config.json";
+    let mut path = config_dir().unwrap();
+    path.push("custom_presence.json");
     let mut system = System::new_all();
 
     loop {
@@ -47,7 +43,7 @@ fn main() {
             }
             Err(error) => {
                 if error.kind() == NotFound {
-                    println!("Make a config file at {}", path);
+                    println!("Make a config file at {}", path.to_string_lossy());
                 }
                 return;
             }
