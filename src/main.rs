@@ -7,6 +7,7 @@ use std::cmp;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::ErrorKind::NotFound;
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -29,8 +30,9 @@ struct Config {
 }
 
 fn main() {
-    let mut path = config_dir().unwrap();
-    path.push("custom_presence.json");
+    let path: PathBuf = [config_dir().unwrap(), PathBuf::from("custom_presence.json")]
+        .iter()
+        .collect();
     let mut system = System::new_all();
 
     loop {
