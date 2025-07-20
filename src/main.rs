@@ -1,6 +1,6 @@
 use discord_presence::{models::ActivityType, Client, Event};
 use serde::Deserialize;
-use sysinfo::System;
+use sysinfo::{Pid, System};
 
 use std::cmp;
 use std::env::current_exe;
@@ -24,7 +24,8 @@ struct Game {
 #[derive(Deserialize)]
 struct Config {
     games: Vec<Game>,
-    wait_time: u64,
+    scan_time: u64,
+    check_time: u64,
 }
 
 fn main() {
@@ -34,8 +35,7 @@ fn main() {
         .and_then(|p| p.to_str().map(|s| s.to_owned()))
         .expect("Failed to convert path to string")
         + "/config.json";
-
-    let mut drpc;
+    let mut system = System::new_all();
 
     loop {
         println!("-------------------");
@@ -52,13 +52,14 @@ fn main() {
                 return;
             }
         };
-
         let reader = BufReader::new(file);
-
         let config: Config =
             serde_json::from_reader(reader).expect("Unable to read the config JSON");
 
-        let system = System::new_all();
+        let mut drpc = Client::new(0);
+        let mut pid: Option<Pid> = None;
+
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
         'gamescan: for game in config.games {
             println!("Searching for processes that match {}", game.process_name);
@@ -68,6 +69,8 @@ fn main() {
             for process in system.processes_by_exact_name(game.process_name[..name_length].as_ref())
             {
                 if let None = process.thread_kind() {
+                    pid = Some(process.pid());
+
                     println!("Process {} matches {}", process.pid(), game.process_name);
 
                     drpc = Client::new(game.app_id);
@@ -103,13 +106,33 @@ fn main() {
             }
         }
 
+        match pid {
+            Some(p) => {
+                while let Some(_) = system.process(p) {
+                    println!("Process {} is still running.", p);
+                    println!(
+                        "Sleeping for {} seconds before the next process check.",
+                        config.check_time
+                    );
+                    sleep(Duration::new(config.check_time, 0));
+                    system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[p]), true);
+                }
+
+                println!("Process ended!");
+                drpc.shutdown().unwrap();
+            }
+            None => {
+                println!("No process found.");
+            }
+        }
+
         println!(
             "Sleeping for {} seconds before the next scan.",
-            config.wait_time
+            config.scan_time
         );
 
         println!("-------------------");
 
-        sleep(Duration::new(config.wait_time, 0));
+        sleep(Duration::new(config.scan_time, 0));
     }
 }
